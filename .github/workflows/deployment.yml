@@ -25,13 +25,20 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.PORT }}
           script: |
+            set -euo pipefail
+
             cd ~/apps/staking || exit 1
 
-            # Pull the latest changes from the repository
-            git fetch origin
-            git checkout main
-            git pull origin main
+            # Ensure the working tree matches the remote main branch
+            if ! git fetch --prune origin; then
+              echo "Failed to fetch from origin. Aborting deployment."
+              exit 1
+            fi
 
+            if ! git reset --hard origin/main; then
+              echo "Failed to reset to origin/main. Aborting deployment."
+              exit 1
+            fi
             # Build and deploy using Docker Compose
             docker compose build
             docker compose up -d
