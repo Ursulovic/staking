@@ -1,8 +1,17 @@
+name: DGRS Staking
+
 services:
   web:
-    build: .
+    build:
+      context: .
+      args:
+        PUBLIC_RPC_URL: ${PUBLIC_RPC_URL}
+        PUBLIC_CHAIN_ID: ${PUBLIC_CHAIN_ID}
+        PUBLIC_POTENTIALS_ADDRESS: ${PUBLIC_POTENTIALS_ADDRESS}
+        PUBLIC_STAKING_ADDRESS: ${PUBLIC_STAKING_ADDRESS}
+        PUBLIC_GRAPHQL_ENDPOINT: ${PUBLIC_GRAPHQL_ENDPOINT}
     ports:
-      - "80:80"
+      - "${STAKING_PORT:-4331}:4321"
     env_file:
       - .env
     restart: unless-stopped

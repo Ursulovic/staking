@@ -1,6 +1,6 @@
 # Makefile for running Astro Svelte application with variables
 
-PKG_MGR ?= npm
+PKG_MGR ?= pnpm
 
 install:
 	$(PKG_MGR) install
@@ -23,4 +23,4 @@ test:
 clean:
 	rm -rf node_modules .astro dist
 
-.PHONY: install dev build preview clean
+.PHONY: install dev build format preview test clean
