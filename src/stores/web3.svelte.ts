@@ -13,5 +13,6 @@ export const dataStatus = writable<
   'idle' | 'loading' | 'ready' | 'empty' | 'error'
 >('idle');
 export const busy = writable<
-  'idle' | 'fetch' | 'approve' | 'stake' | 'unstake'
+  'idle' | 'fetch' | 'approve' | 'stake' | 'unstake' | 'funding'
 >('idle');
+export const approvalFunded = writable(false);

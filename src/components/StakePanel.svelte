@@ -13,12 +13,15 @@
     dataStatus,
     busy as busyStore,
     isPaused as pausedStore,
+    approvalFunded,
   } from '@stores/web3.svelte';
   import {
     stakingContract,
     isPaused,
     stakeTokens,
     unstakeTokens,
+    checkApproval,
+    fundApproval,
   } from '@lib/staking';
   import {
     getUserStakingData,
@@ -45,9 +48,6 @@
   let globalLockMonths = $state<number>(DEFAULT_LOCK);
 
   function isUnlockable(token: TokenState) {
-    console.log(token);
-    console.log(token.unlockTime <= Math.floor(Date.now() / 1000));
-    console.log(Number(token.unlockTime), Math.floor(Date.now() / 1000));
     return (
       token.isStaked &&
       token.unlockTime > 0 &&
@@ -201,13 +201,18 @@
     }
   }
 
-  // Approval is still handled on-chain via ethers. Cache status so UI can gate stake button.
+  // Check approval via relay backend (reads on-chain).
   async function refreshApproval(addr: string) {
     if (!stakingReady) return;
     try {
-      approved = await isApprovedForAll(addr, STAKING_ADDRESS);
-    } catch (err) {
-      console.error(err);
+      approved = await checkApproval(addr);
+    } catch {
+      // Fallback to direct on-chain check if relay is down.
+      try {
+        approved = await isApprovedForAll(addr, STAKING_ADDRESS);
+      } catch (err) {
+        console.error(err);
+      }
     }
   }
 
@@ -257,6 +262,34 @@
     loadStakingData(current);
   }
 
+  // Request ETH from backend to cover approval gas.
+  async function handleFundApproval() {
+    const current = $address;
+    if (!current) {
+      toastStore.show('Connect a wallet first', 'error');
+      return;
+    }
+
+    busyStore.set('funding');
+
+    try {
+      await fundApproval(current);
+      approvalFunded.set(true);
+      toastStore.show('ETH sent for approval gas');
+    } catch (err: any) {
+      console.error(err);
+      // If already approved, treat as success.
+      if (err?.message?.includes('already approved')) {
+        approved = true;
+        toastStore.show('Already approved');
+      } else {
+        toastStore.show(err?.message || 'Failed to fund approval', 'error');
+      }
+    } finally {
+      busyStore.set('idle');
+    }
+  }
+
   async function handleApprove() {
     if (!stakingReady) {
       toastStore.show('Set PUBLIC_STAKING_ADDRESS to continue', 'error');
@@ -273,6 +306,12 @@
     if (!currentProvider) {
       toastStore.show('Connect a wallet first', 'error');
       return;
+    }
+
+    // Fund approval gas if not already funded.
+    if (!$approvalFunded) {
+      await handleFundApproval();
+      if (!$approvalFunded) return; // funding failed
     }
 
     busyStore.set('approve');
@@ -329,14 +368,14 @@
 
     try {
       const signer = await currentProvider.getSigner();
-      await stakeTokens(signer, tokenIds, months);
+      const result = await stakeTokens(signer, tokenIds, months);
       toastStore.show(
-        `Staked ${tokenIds.length} NFT${tokenIds.length > 1 ? 's' : ''} successfully`,
+        `Staked ${tokenIds.length} NFT${tokenIds.length > 1 ? 's' : ''} successfully (tx: ${result.tx_hash.slice(0, 10)}...)`,
       );
       await loadStakingData(current);
     } catch (err) {
       console.error(err);
-      toastStore.show('Staking transaction failed', 'error');
+      toastStore.show('Staking failed — please try again', 'error');
     } finally {
       busyStore.set('idle');
     }
@@ -368,14 +407,14 @@
 
     try {
       const signer = await currentProvider.getSigner();
-      await unstakeTokens(signer, tokenIds);
+      const result = await unstakeTokens(signer, tokenIds);
       toastStore.show(
-        `Unstaked ${tokenIds.length} NFT${tokenIds.length > 1 ? 's' : ''} successfully`,
+        `Unstaked ${tokenIds.length} NFT${tokenIds.length > 1 ? 's' : ''} successfully (tx: ${result.tx_hash.slice(0, 10)}...)`,
       );
       await loadStakingData(current);
     } catch (err) {
       console.error(err);
-      toastStore.show('Unstaking transaction failed', 'error');
+      toastStore.show('Unstaking failed — please try again', 'error');
     } finally {
       busyStore.set('idle');
     }
@@ -386,6 +425,7 @@
     connected.set(!!current);
     if (!current) {
       approved = false;
+      approvalFunded.set(false);
       myTokens.set([]);
       userStats.set(null);
       globalStats.set(null);
@@ -530,9 +570,11 @@
             onclick={handleApprove}
             text={approved
               ? 'Approved'
-              : $busyStore === 'approve'
-                ? 'Approving…'
-                : 'Approve staking contract'}
+              : $busyStore === 'funding'
+                ? 'Funding gas…'
+                : $busyStore === 'approve'
+                  ? 'Approving…'
+                  : 'Approve staking contract'}
             disabled={approveDisabled}
           />
           <button
@@ -661,7 +703,7 @@
         <span class="flex-row flex-wrap">
           <button class="cta" onclick={handleStake} disabled={stakingDisabled}>
             {#if $busyStore === 'stake'}
-              Staking…
+              Signing & relaying…
             {:else}
               Stake selected NFTs
               {#if stakeSelectionCount}
@@ -677,7 +719,7 @@
             disabled={unstakingDisabled}
           >
             {#if $busyStore === 'unstake'}
-              Unstaking…
+              Signing & relaying…
             {:else}
               Unstake selected NFTs
               {#if unstakeSelectionCount}
