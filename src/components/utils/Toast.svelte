@@ -46,7 +46,7 @@
   type="button"
   aria-live={type === 'error' ? 'assertive' : 'polite'}
 >
-  <p>{@html message}</p>
+  <p>{message}</p>
 </button>
 
 <style lang="scss">
