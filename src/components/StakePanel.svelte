@@ -26,8 +26,9 @@
   import {
     getUserStakingData,
     getGlobalStats,
-    getOwnedTokenIds,
+    getOwnedTokenIds as getOwnedTokenIdsFromIndexer,
   } from '@lib/indexer';
+  import { getOwnedTokenSet } from '@lib/potentials';
   import { STAKING_ADDRESS } from '@lib/contract';
   import { toastStore } from '@stores/toast.svelte';
   import { previewStaking } from '@lib/stakingPreview';
@@ -140,11 +141,36 @@
     dataStatus.set('loading');
 
     try {
-      const [ownedIds, userData, globalSnapshot] = await Promise.all([
-        getOwnedTokenIds(addr),
-        getUserStakingData(addr),
-        getGlobalStats(),
-      ]);
+      // Try indexer first, fall back to on-chain multicall if unavailable.
+      let ownedIds: number[];
+      let userData: Awaited<ReturnType<typeof getUserStakingData>>;
+      let globalSnapshot: Awaited<ReturnType<typeof getGlobalStats>>;
+      try {
+        [ownedIds, userData, globalSnapshot] = await Promise.all([
+          getOwnedTokenIdsFromIndexer(addr),
+          getUserStakingData(addr),
+          getGlobalStats(),
+        ]);
+      } catch {
+        console.warn('Indexer unavailable, falling back to on-chain reads');
+        const { ids } = await getOwnedTokenSet(addr as `0x${string}`);
+        ownedIds = ids;
+        userData = {
+          stakedNFTs: [],
+          totalVotingPower: 0n,
+          totalEffectiveVotingPower: 0n,
+          accumulatedPoints: 0,
+          currentPoints: 0,
+          pointsPerSecond: 0,
+          stakedNFTCount: 0,
+        };
+        globalSnapshot = {
+          totalVotingPower: 0n,
+          totalEffectiveVotingPower: 0n,
+          totalStakedNFTs: 0,
+          totalAccumulatedPoints: 0,
+        };
+      }
 
       const stakedTokens = userData.stakedNFTs.map(normalizeToken);
 
@@ -278,10 +304,13 @@
       toastStore.show('ETH sent for approval gas');
     } catch (err: any) {
       console.error(err);
-      // If already approved, treat as success.
+      // If already approved or already funded, treat as success.
       if (err?.message?.includes('already approved')) {
         approved = true;
         toastStore.show('Already approved');
+      } else if (err?.message?.includes('already sent recently')) {
+        approvalFunded.set(true);
+        toastStore.show('Approval already funded');
       } else {
         toastStore.show(err?.message || 'Failed to fund approval', 'error');
       }

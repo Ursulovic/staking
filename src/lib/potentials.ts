@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { createPublicClient, http } from 'viem';
-import { sepolia as viemSepolia } from 'viem/chains';
+import { sepolia as viemSepolia, baseSepolia as viemBaseSepolia, base as viemBase } from 'viem/chains';
 import {
   CHAIN_ID,
   RPC_URL,
@@ -9,18 +9,25 @@ import {
   POTENTIALS_ABI_VIEM,
 } from '@lib/contract';
 
-const sepolia = {
-  ...viemSepolia,
+const chainMap = {
+  [viemSepolia.id]: viemSepolia,
+  [viemBaseSepolia.id]: viemBaseSepolia,
+  [viemBase.id]: viemBase,
+} as const;
+const baseChain = chainMap[CHAIN_ID as keyof typeof chainMap] ?? viemBaseSepolia;
+
+const activeChain = {
+  ...baseChain,
   id: CHAIN_ID,
   rpcUrls: {
-    ...viemSepolia.rpcUrls,
+    ...baseChain.rpcUrls,
     default: { http: [RPC_URL] },
     public: { http: [RPC_URL] },
   },
 } as const;
 
 const viemClient = createPublicClient({
-  chain: sepolia,
+  chain: activeChain,
   transport: http(RPC_URL),
 });
 

@@ -30,15 +30,29 @@ export async function isPaused(provider?: ethers.Provider) {
 // --- Relay API helpers ---
 
 async function relayFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${RELAY_API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    throw new Error(body?.message || body?.error || `Relay error ${res.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const res = await fetch(`${RELAY_API_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      ...options,
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      const detail = body?.error?.details || body?.error || '';
+      throw new Error(body?.message ? `${body.message} ${detail}` : `Relay error ${res.status}`);
+    }
+    return body.data as T;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error('Relay request timed out');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
-  return body.data as T;
 }
 
 export async function getForwarderNonce(address: string): Promise<string> {
