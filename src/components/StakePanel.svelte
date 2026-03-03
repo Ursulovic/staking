@@ -26,7 +26,6 @@
   import {
     getUserStakingData,
     getGlobalStats,
-    getOwnedTokenIds as getOwnedTokenIdsFromIndexer,
   } from '@lib/indexer';
   import { getOwnedTokenSet } from '@lib/potentials';
   import { STAKING_ADDRESS } from '@lib/contract';
@@ -146,15 +145,12 @@
       let userData: Awaited<ReturnType<typeof getUserStakingData>>;
       let globalSnapshot: Awaited<ReturnType<typeof getGlobalStats>>;
       try {
-        [ownedIds, userData, globalSnapshot] = await Promise.all([
-          getOwnedTokenIdsFromIndexer(addr),
+        [userData, globalSnapshot] = await Promise.all([
           getUserStakingData(addr),
           getGlobalStats(),
         ]);
       } catch {
         console.warn('Indexer unavailable, falling back to on-chain reads');
-        const { ids } = await getOwnedTokenSet(addr as `0x${string}`);
-        ownedIds = ids;
         userData = {
           stakedNFTs: [],
           totalVotingPower: 0n,
@@ -171,6 +167,9 @@
           totalAccumulatedPoints: 0,
         };
       }
+      // Ownership is always read on-chain (indexer doesn't track it).
+      const { ids } = await getOwnedTokenSet(addr as `0x${string}`);
+      ownedIds = ids;
 
       const stakedTokens = userData.stakedNFTs.map(normalizeToken);
 
