@@ -63,7 +63,7 @@ export async function getUserStakingData(
     User: RawUser[];
     StakedNFT: RawStakedNFT[];
     GlobalState: RawGlobalState[];
-  }>(query, { user: userAddress.toLowerCase() });
+  }>(query, { user: userAddress });
 
   const user = result.User[0];
   const globalState = result.GlobalState[0];
@@ -146,18 +146,7 @@ export async function getGlobalStats(): Promise<GlobalStats> {
   };
 }
 
-export async function getOwnedTokenIds(owner: string): Promise<number[]> {
-  const query = `
-    query GetOwnedTokens($owner: String!) {
-      TokenInfo(where: { owner: { _eq: $owner } }) {
-        tokenId
-      }
-    }
-  `;
-
-  const result = await queryGraphQL<{
-    TokenInfo: { tokenId: string }[];
-  }>(query, { owner: owner.toLowerCase() });
-
-  return (result.TokenInfo ?? []).map((t) => Number(t.tokenId));
+export async function getOwnedTokenIds(_owner: string): Promise<number[]> {
+  // TokenInfo is not tracked by the indexer — ownership must be read on-chain.
+  throw new Error('TokenInfo not available in indexer');
 }
