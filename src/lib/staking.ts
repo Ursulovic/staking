@@ -86,13 +86,40 @@ export async function fundApproval(
 async function relayForwardRequest(
   req: ForwardRequestData,
 ): Promise<RelayResult> {
-  return relayFetch<RelayResult>('/staking/relay', {
+  const result = await relayFetch<RelayResult>('/staking/relay', {
     method: 'POST',
     body: JSON.stringify({ request: req }),
   });
+
+  // Wait for the transaction to be mined and verify it succeeded on-chain.
+  const receipt = await readProvider.waitForTransaction(result.tx_hash, 1, 60_000);
+  if (!receipt || receipt.status === 0) {
+    throw new Error('Transaction reverted on-chain');
+  }
+
+  return result;
 }
 
 // --- EIP-712 signing ---
+
+function estimateGas(data: string): string {
+  // Base overhead: tx cost, forwarder verification, proxy delegatecall, reentrancy guard
+  const BASE_GAS = 50_000;
+  // Per-NFT cost: storage writes, safeTransferFrom, events (~44-122k, use worst case)
+  const PER_NFT_GAS = 120_000;
+
+  try {
+    const iface = new ethers.Interface(STAKING_ABI);
+    const decoded = iface.parseTransaction({ data });
+    if (decoded && (decoded.name === 'stake' || decoded.name === 'unstake')) {
+      const tokenIds = decoded.args[0];
+      return String(BASE_GAS + tokenIds.length * PER_NFT_GAS);
+    }
+  } catch {
+    // Fall through to default
+  }
+  return String(BASE_GAS + PER_NFT_GAS);
+}
 
 async function signForwardRequest(
   signer: ethers.Signer,
@@ -106,8 +133,7 @@ async function signForwardRequest(
   // Set a 10-minute deadline
   const deadline = Math.floor(Date.now() / 1000) + 600;
 
-  // Gas estimate for staking operations (generous buffer)
-  const gas = '500000';
+  const gas = estimateGas(data);
 
   const domainData = {
     name: domain.name,
