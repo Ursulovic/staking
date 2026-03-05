@@ -593,25 +593,12 @@
           {availableCount} / {$myTokens.length} NFTs available for staking
         </h4>
 
-        <span class="flex-row flex-wrap">
-          <ContractSVG
-            onclick={handleApprove}
-            text={approved
-              ? 'Approved'
-              : $busyStore === 'funding'
-                ? 'Funding gas…'
-                : $busyStore === 'approve'
-                  ? 'Approving…'
-                  : 'Approve staking contract'}
-            disabled={approveDisabled}
-          />
-          <button
-            onclick={selectAllForStaking}
-            disabled={$pausedStore || !availableCount || $busyStore !== 'idle'}
-          >
-            Select all to stake
-          </button>
-        </span>
+        <button
+          onclick={selectAllForStaking}
+          disabled={$pausedStore || !availableCount || $busyStore !== 'idle'}
+        >
+          Select all to stake
+        </button>
       {:else if $myTokens.length}
         <h4>All {$myTokens.length} NFTs are currently staked</h4>
       {/if}
@@ -726,7 +713,23 @@
               </p>
             </div>
           {/if}
+
+          <span class="caption-font transparent-white-txt">
+            Staked NFTs are locked for the full duration and cannot be unstaked early.
+          </span>
         </div>
+
+        {#if !approved}
+          <ContractSVG
+            onclick={handleApprove}
+            text={$busyStore === 'funding'
+              ? 'Funding gas…'
+              : $busyStore === 'approve'
+                ? 'Approving…'
+                : 'Approve staking contract'}
+            disabled={approveDisabled}
+          />
+        {/if}
 
         <span class="flex-row flex-wrap">
           <button class="cta" onclick={handleStake} disabled={stakingDisabled}>
