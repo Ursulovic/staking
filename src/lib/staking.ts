@@ -103,22 +103,39 @@ async function relayForwardRequest(
 // --- EIP-712 signing ---
 
 function estimateGas(data: string): string {
-  // Base overhead: tx cost, forwarder verification, proxy delegatecall, reentrancy guard
-  const BASE_GAS = 50_000;
-  // Per-NFT cost: storage writes, safeTransferFrom, events (~44-122k, use worst case)
-  const PER_NFT_GAS = 120_000;
+  // Forwarder overhead: signature verification, _checkForwardedGas, proxy delegatecall
+  const OVERHEAD = 80_000;
+  // First token buffer: covers ERC721A ownerOf backward scan for the first (lowest) token
+  // in a batch. Handles up to ~130 empty slots (worst case for current supply).
+  const FIRST_TOKEN_BUFFER = 300_000;
+  // Per-NFT base cost: safeTransferFrom + storage writes + events.
+  // When sorted ascending, each transfer initializes the next slot, so ownerOf is O(1).
+  const PER_NFT = 80_000;
+  // ERC721A scan cost per empty slot between non-consecutive token IDs.
+  // Each gap slot requires a cold SLOAD (~2100) plus loop overhead.
+  const SCAN_PER_SLOT = 2_500;
 
   try {
     const iface = new ethers.Interface(STAKING_ABI);
     const decoded = iface.parseTransaction({ data });
     if (decoded && (decoded.name === 'stake' || decoded.name === 'unstake')) {
-      const tokenIds = decoded.args[0];
-      return String(BASE_GAS + tokenIds.length * PER_NFT_GAS);
+      const tokenIds: bigint[] = decoded.args[0];
+      const count = tokenIds.length;
+      if (count === 0) return String(OVERHEAD + FIRST_TOKEN_BUFFER + PER_NFT);
+
+      const sorted = [...tokenIds].map(Number).sort((a, b) => a - b);
+      const span = sorted[count - 1] - sorted[0];
+      // Gaps = empty slots between our tokens that still need scanning
+      const gaps = Math.max(0, span - count + 1);
+
+      return String(
+        OVERHEAD + FIRST_TOKEN_BUFFER + count * PER_NFT + gaps * SCAN_PER_SLOT,
+      );
     }
   } catch {
     // Fall through to default
   }
-  return String(BASE_GAS + PER_NFT_GAS);
+  return String(OVERHEAD + FIRST_TOKEN_BUFFER + PER_NFT);
 }
 
 async function signForwardRequest(
@@ -179,8 +196,14 @@ export async function stakeTokens(
   if (tokenIds.length === 0) throw new Error('No tokens selected');
   if (tokenIds.length !== months.length) throw new Error('Length mismatch');
 
+  // Sort ascending so each ERC721A transfer initializes the next slot,
+  // making subsequent ownerOf calls O(1) instead of scanning backwards.
+  const indices = tokenIds.map((_, i) => i).sort((a, b) => tokenIds[a] - tokenIds[b]);
+  const sortedIds = indices.map((i) => tokenIds[i]);
+  const sortedMonths = indices.map((i) => months[i]);
+
   const iface = new ethers.Interface(STAKING_ABI);
-  const calldata = iface.encodeFunctionData('stake', [tokenIds, months]);
+  const calldata = iface.encodeFunctionData('stake', [sortedIds, sortedMonths]);
 
   const from = await signer.getAddress();
   const [domain, nonce] = await Promise.all([
@@ -205,8 +228,12 @@ export async function unstakeTokens(
 ) {
   if (tokenIds.length === 0) throw new Error('No tokens selected');
 
+  // Sort ascending for consistent gas estimation (unstake ownerOf is O(1)
+  // since slots were initialized during stake, but sorting keeps it predictable).
+  const sortedIds = [...tokenIds].sort((a, b) => a - b);
+
   const iface = new ethers.Interface(STAKING_ABI);
-  const calldata = iface.encodeFunctionData('unstake', [tokenIds]);
+  const calldata = iface.encodeFunctionData('unstake', [sortedIds]);
 
   const from = await signer.getAddress();
   const [domain, nonce] = await Promise.all([
