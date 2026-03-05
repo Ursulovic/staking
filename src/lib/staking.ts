@@ -83,6 +83,13 @@ export async function fundApproval(
   return data.tx_hash;
 }
 
+export async function waitForFundingTx(txHash: string): Promise<void> {
+  const receipt = await readProvider.waitForTransaction(txHash, 1, 60_000);
+  if (!receipt || receipt.status === 0) {
+    throw new Error('Funding transaction failed on-chain');
+  }
+}
+
 async function relayForwardRequest(
   req: ForwardRequestData,
 ): Promise<RelayResult> {

@@ -22,6 +22,7 @@
     unstakeTokens,
     checkApproval,
     fundApproval,
+    waitForFundingTx,
   } from '@lib/staking';
   import {
     getUserStakingData,
@@ -298,9 +299,12 @@
     busyStore.set('funding');
 
     try {
-      await fundApproval(current);
+      const txHash = await fundApproval(current);
+      const waitingToast = toastStore.show('Transferring funds for approval gas…', 'info', 60_000);
+      await waitForFundingTx(txHash);
+      toastStore.close(waitingToast);
       approvalFunded.set(true);
-      toastStore.show('ETH sent for approval gas');
+      toastStore.show('Funds received — opening wallet for approval');
     } catch (err: any) {
       console.error(err);
       // If already approved or already funded, treat as success.
