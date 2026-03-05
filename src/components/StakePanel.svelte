@@ -404,6 +404,8 @@
       toastStore.show(
         `Staked ${tokenIds.length} NFT${tokenIds.length > 1 ? 's' : ''} successfully (tx: ${result.tx_hash.slice(0, 10)}...)`,
       );
+      // Short delay to let the indexer process the new transaction.
+      await new Promise((r) => setTimeout(r, 3000));
       await loadStakingData(current);
     } catch (err) {
       console.error(err);
@@ -443,6 +445,8 @@
       toastStore.show(
         `Unstaked ${tokenIds.length} NFT${tokenIds.length > 1 ? 's' : ''} successfully (tx: ${result.tx_hash.slice(0, 10)}...)`,
       );
+      // Short delay to let the indexer process the new transaction.
+      await new Promise((r) => setTimeout(r, 3000));
       await loadStakingData(current);
     } catch (err) {
       console.error(err);
