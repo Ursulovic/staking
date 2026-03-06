@@ -245,10 +245,7 @@
   // Ping the contract (read-only) to see if staking is paused.
   async function refreshPausedState() {
     try {
-      const currentProvider = $provider as BrowserProvider | null;
-      const paused = currentProvider
-        ? await isPaused(currentProvider)
-        : await readOnlyStaking.isStakingPaused();
+      const paused = await isPaused();
       pausedStore.set(!!paused);
     } catch (err) {
       console.error(err);

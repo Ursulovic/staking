@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { createPublicClient, http } from 'viem';
-import { sepolia as viemSepolia, baseSepolia as viemBaseSepolia, base as viemBase } from 'viem/chains';
+import { mainnet as viemMainnet, sepolia as viemSepolia, baseSepolia as viemBaseSepolia, base as viemBase } from 'viem/chains';
 import {
   CHAIN_ID,
   RPC_URL,
@@ -10,6 +10,7 @@ import {
 } from '@lib/contract';
 
 const chainMap = {
+  [viemMainnet.id]: viemMainnet,
   [viemSepolia.id]: viemSepolia,
   [viemBaseSepolia.id]: viemBaseSepolia,
   [viemBase.id]: viemBase,

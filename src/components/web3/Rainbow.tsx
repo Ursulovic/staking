@@ -11,7 +11,7 @@ import {
 } from '@rainbow-me/rainbowkit';
 
 import { WagmiProvider, useAccount, useAccountEffect, http } from 'wagmi';
-import { sepolia, baseSepolia, base } from 'wagmi/chains';
+import { mainnet, sepolia, baseSepolia, base } from 'wagmi/chains';
 import { CHAIN_ID, RPC_URL } from '@/lib/contract';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -26,6 +26,7 @@ import { walletReady } from '@stores/web3.svelte';
 /* 1.  Global wagmi / RainbowKit config (must not re‑create on render) */
 /* ------------------------------------------------------------------ */
 const chainMap = {
+  [mainnet.id]: mainnet,
   [sepolia.id]: sepolia,
   [baseSepolia.id]: baseSepolia,
   [base.id]: base,
