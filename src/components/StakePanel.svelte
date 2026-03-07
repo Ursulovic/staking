@@ -23,6 +23,7 @@
     checkApproval,
     fundApproval,
     waitForFundingTx,
+    hasEnoughEthForApproval,
   } from '@lib/staking';
   import {
     getUserStakingData,
@@ -312,7 +313,19 @@
         approvalFunded.set(true);
         toastStore.show('Approval already funded');
       } else {
-        toastStore.show(err?.message || 'Failed to fund approval', 'error');
+        // Funding may have succeeded on-chain even though the response timed out.
+        // Check if the user already has enough ETH to cover the approval tx.
+        try {
+          const hasEth = await hasEnoughEthForApproval(current);
+          if (hasEth) {
+            approvalFunded.set(true);
+            toastStore.show('Funds detected — proceeding to approval');
+          } else {
+            toastStore.show(err?.message || 'Failed to fund approval', 'error');
+          }
+        } catch {
+          toastStore.show(err?.message || 'Failed to fund approval', 'error');
+        }
       }
     } finally {
       busyStore.set('idle');

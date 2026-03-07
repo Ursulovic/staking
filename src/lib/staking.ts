@@ -29,9 +29,9 @@ export async function isPaused(provider?: ethers.Provider) {
 
 // --- Relay API helpers ---
 
-async function relayFetch<T>(path: string, options?: RequestInit): Promise<T> {
+async function relayFetch<T>(path: string, options?: RequestInit & { timeoutMs?: number }): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), options?.timeoutMs ?? 10000);
 
   try {
     const res = await fetch(`${RELAY_API_URL}${path}`, {
@@ -78,9 +78,17 @@ export async function fundApproval(
 ): Promise<string> {
   const data = await relayFetch<{ tx_hash: string }>(
     `/staking/fund-approval/${address}`,
-    { method: 'POST' },
+    { method: 'POST', timeoutMs: 30000 },
   );
   return data.tx_hash;
+}
+
+// Minimum ETH balance (in wei) to cover a setApprovalForAll tx on mainnet.
+const MIN_APPROVAL_ETH = 500_000_000_000_000n; // 0.0005 ETH
+
+export async function hasEnoughEthForApproval(address: string): Promise<boolean> {
+  const balance = await readProvider.getBalance(address);
+  return balance >= MIN_APPROVAL_ETH;
 }
 
 export async function waitForFundingTx(txHash: string): Promise<void> {
