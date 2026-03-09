@@ -21,9 +21,10 @@
     stakeTokens,
     unstakeTokens,
     checkApproval,
-    fundApproval,
+    fundGas,
     waitForFundingTx,
-    hasEnoughEthForApproval,
+    hasEnoughEthForGas,
+    ensureGasFunded,
   } from '@lib/staking';
   import {
     getUserStakingData,
@@ -286,8 +287,8 @@
     loadStakingData(current);
   }
 
-  // Request ETH from backend to cover approval gas.
-  async function handleFundApproval() {
+  // Request ETH from backend to cover gas.
+  async function handleFundGas() {
     const current = $address;
     if (!current) {
       toastStore.show('Connect a wallet first', 'error');
@@ -297,34 +298,29 @@
     busyStore.set('funding');
 
     try {
-      const txHash = await fundApproval(current);
-      const waitingToast = toastStore.show('Transferring funds for approval gas…', 'info', 60_000);
+      const txHash = await fundGas(current, availableCount || 1);
+      const waitingToast = toastStore.show('Transferring funds for gas…', 'info', 60_000);
       await waitForFundingTx(txHash);
       toastStore.close(waitingToast);
       approvalFunded.set(true);
       toastStore.show('Funds received — opening wallet for approval');
     } catch (err: any) {
       console.error(err);
-      // If already approved or already funded, treat as success.
-      if (err?.message?.includes('already approved')) {
-        approved = true;
-        toastStore.show('Already approved');
-      } else if (err?.message?.includes('already sent recently')) {
+      if (err?.message?.includes('already sent recently')) {
         approvalFunded.set(true);
-        toastStore.show('Approval already funded');
+        toastStore.show('Gas already funded');
       } else {
         // Funding may have succeeded on-chain even though the response timed out.
-        // Check if the user already has enough ETH to cover the approval tx.
         try {
-          const hasEth = await hasEnoughEthForApproval(current);
+          const hasEth = await hasEnoughEthForGas(current);
           if (hasEth) {
             approvalFunded.set(true);
-            toastStore.show('Funds detected — proceeding to approval');
+            toastStore.show('Funds detected — proceeding');
           } else {
-            toastStore.show(err?.message || 'Failed to fund approval', 'error');
+            toastStore.show(err?.message || 'Failed to fund gas', 'error');
           }
         } catch {
-          toastStore.show(err?.message || 'Failed to fund approval', 'error');
+          toastStore.show(err?.message || 'Failed to fund gas', 'error');
         }
       }
     } finally {
@@ -350,9 +346,9 @@
       return;
     }
 
-    // Fund approval gas if not already funded.
+    // Fund gas if not already funded.
     if (!$approvalFunded) {
-      await handleFundApproval();
+      await handleFundGas();
       if (!$approvalFunded) return; // funding failed
     }
 
@@ -406,6 +402,17 @@
     const tokenIds = selection.map((token) => token.tokenId);
     const months = Array(tokenIds.length).fill(globalLockMonths);
 
+    busyStore.set('funding');
+
+    try {
+      await ensureGasFunded(current, tokenIds.length);
+    } catch (err: any) {
+      console.error(err);
+      toastStore.show(err?.message || 'Failed to fund gas for staking', 'error');
+      busyStore.set('idle');
+      return;
+    }
+
     busyStore.set('stake');
 
     try {
@@ -444,6 +451,17 @@
     }
 
     const tokenIds = selection.map((token) => token.tokenId);
+
+    busyStore.set('funding');
+
+    try {
+      await ensureGasFunded(current, tokenIds.length);
+    } catch (err: any) {
+      console.error(err);
+      toastStore.show(err?.message || 'Failed to fund gas for unstaking', 'error');
+      busyStore.set('idle');
+      return;
+    }
 
     busyStore.set('unstake');
 
@@ -748,7 +766,7 @@
         <span class="flex-row flex-wrap">
           <button class="cta" onclick={handleStake} disabled={stakingDisabled}>
             {#if $busyStore === 'stake'}
-              Signing & relaying…
+              Staking…
             {:else}
               Stake selected NFTs
               {#if stakeSelectionCount}
@@ -764,7 +782,7 @@
             disabled={unstakingDisabled}
           >
             {#if $busyStore === 'unstake'}
-              Signing & relaying…
+              Unstaking…
             {:else}
               Unstake selected NFTs
               {#if unstakeSelectionCount}
