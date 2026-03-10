@@ -24,11 +24,6 @@ async function waitWithTimeout(tx: ethers.TransactionResponse) {
   return receipt;
 }
 
-export async function hasEnoughEthForGas(address: string): Promise<boolean> {
-  const balance = await readProvider.getBalance(address);
-  return balance > 0n;
-}
-
 export function stakingContract(
   readerOrSigner?: ethers.Provider | ethers.Signer,
 ) {

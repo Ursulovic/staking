@@ -19,7 +19,6 @@
     isPaused,
     stakeTokens,
     unstakeTokens,
-    hasEnoughEthForGas,
   } from '@lib/staking';
   import {
     getUserStakingData,
@@ -282,19 +281,6 @@
     return fallback;
   }
 
-  async function checkBalance(addr: string): Promise<boolean> {
-    try {
-      const hasEth = await hasEnoughEthForGas(addr);
-      if (!hasEth) {
-        toastStore.show('You need ETH in your wallet to pay for gas fees', 'error');
-        return false;
-      }
-      return true;
-    } catch {
-      return true; // don't block if check fails
-    }
-  }
-
   function onRefreshClick() {
     const current = $address;
     if (!current) return;
@@ -318,8 +304,6 @@
       toastStore.show('Connect a wallet first', 'error');
       return;
     }
-
-    if (!(await checkBalance(current))) return;
 
     busyStore.set('approve');
 
@@ -371,8 +355,6 @@
     const tokenIds = selection.map((token) => token.tokenId);
     const months = Array(tokenIds.length).fill(globalLockMonths);
 
-    if (!(await checkBalance(current))) return;
-
     busyStore.set('stake');
 
     try {
@@ -411,8 +393,6 @@
     }
 
     const tokenIds = selection.map((token) => token.tokenId);
-
-    if (!(await checkBalance(current))) return;
 
     busyStore.set('unstake');
 
