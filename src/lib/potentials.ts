@@ -54,7 +54,17 @@ export async function setApprovalForAll(
 ) {
   const c = potentialsContract(signer);
   const tx = await c.setApprovalForAll(operator, approved);
-  return await tx.wait();
+  let timer: ReturnType<typeof setTimeout>;
+  const receipt = await Promise.race([
+    tx.wait(),
+    new Promise<null>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('TX_TIMEOUT')), 120_000);
+    }),
+  ]).finally(() => clearTimeout(timer));
+  if (!receipt || receipt.status === 0) {
+    throw new Error('Approval transaction reverted on-chain');
+  }
+  return receipt;
 }
 
 async function getOwnedTokenIds(

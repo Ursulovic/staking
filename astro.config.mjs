@@ -31,11 +31,6 @@ export default defineConfig({
         '@components': `${srcDir}/components`,
       },
     },
-    server: {
-      proxy: {
-        '/staking': 'http://localhost:8080',
-      },
-    },
     worker: {
       format: 'es',
     },
