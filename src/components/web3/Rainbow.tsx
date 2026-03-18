@@ -36,7 +36,7 @@ const activeChain = chainMap[CHAIN_ID as keyof typeof chainMap] ?? baseSepolia;
 export const wagmiConfig = getDefaultConfig({
   appName: 'Degenerous DAO',
   appIcon: 'https://media.degenerousdao.com/assets/logo.png',
-  projectId: '0b8a3fac6220753a719b9aeceb8f19fb',
+  projectId: '469d0e530bfda848e16eb3c3cf84aeb8',
   chains: [activeChain],
   transports: { [activeChain.id]: http(RPC_URL) },
   ssr: false,
