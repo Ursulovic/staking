@@ -26,7 +26,9 @@ a > div {
 }
 
 /* Reset global button styles leaking into RainbowKit modal */
-[role='document'] button {
-  all: revert;
+[role='document'] button,
+[role='document'] button:not(.void-btn) {
+  all: unset;
   cursor: pointer;
+  box-sizing: border-box;
 }
