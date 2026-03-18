@@ -24,3 +24,9 @@
 a > div {
   cursor: pointer;
 }
+
+/* Reset global button styles leaking into RainbowKit modal */
+[role='document'] button {
+  all: revert;
+  cursor: pointer;
+}
