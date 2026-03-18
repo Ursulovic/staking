@@ -77,13 +77,3 @@ a > div {
   height: 1rem;
 }
 
-@media only screen and (max-width: 600px) {
-  [role='document'] button,
-  [role='document'] button:hover,
-  [role='document'] button:active [role='document'] button:disabled,
-  [role='document'] button:disabled:hover,
-  [role='document'] button:disabled:active {
-    background-color: transparent !important;
-    border: none !important;
-  }
-}
